@@ -9,16 +9,10 @@ let path = require('path');
 let session = require('express-session');
 // 导入body-parser 格式化表单的数据
 let bodyParser = require('body-parser');
-// 导入mongoDB 
-const MongoClient = require('mongodb').MongoClient;
-// mongoDB 需要使用到的 配置
-// Connection URL
-const url = 'mongodb://localhost:27017';
+// 导入自己封装的工具函数
+let myT = require(path.join(__dirname,'tools/myT'));
 
-// Database Name
-const dbName = 'SZHM19';
-
-
+let indexRouter = require(path.join(__dirname,'router/indexRouter'));
 
 
 // 创建app-------------------------
@@ -39,6 +33,11 @@ app.use(bodyParser.urlencoded({
     extended: false
 }))
 
+// / 路由4
+// 访问首页 index
+app.use('/index',indexRouter);
+app.engine('art',require('express-art-template'));
+app.set('views','/static/views');
 
 // 路由--------------------------
 // 路由1
@@ -90,7 +89,7 @@ app.get('/login/captchaImg.png', (req, res) => {
     // 生成了一张图片 并返回
     var captcha = svgCaptcha.create();
     // 打印验证码
-    console.log(captcha.text);
+    // console.log(captcha.text);
     // 获取session中的值
     // console.log(req.session.info);
     // 保存 验证码的值 到 session 方便后续的使用
@@ -100,19 +99,7 @@ app.get('/login/captchaImg.png', (req, res) => {
     res.status(200).send(captcha.data);
 })
 
-// 路由4
-// 访问首页 index
-app.get('/index', (req, res) => {
-    // 有session 欢迎
-    if (req.session.userInfo) {
-        // 登陆了
-        res.sendFile(path.join(__dirname, 'static/views/index.html'));
-    } else {
-        // 没有session 去登录页
-        res.setHeader('content-type', 'text/html');
-        res.send("<script>alert('请登录');window.location.href='/login'</script>");
-    }
-})
+
 
 // 路由5
 // 登出操作
@@ -138,38 +125,15 @@ app.post('/register', (req, res) => {
     // 获取用户数据
     let userName = req.body.userName;
     let userPass = req.body.userPass;
-    console.log(userName);
-    console.log(userPass);
-
-    MongoClient.connect(url,  (err, client)=>{
-        // 连上mongo之后 选择使用的库
-        const db = client.db(dbName);
-        // 选择使用的集合
-        let collection = db.collection('userList');
-
-        // 查询数据
-        collection.find({
-            userName
-        }).toArray((err,doc)=>{
-            console.log(doc);
-            if(doc.length==0){
-                // 没有人
-                // 新增数据
-                collection.insertOne({
-                    userName,
-                    userPass
-                },(err,result)=>{
-                    console.log(err);
-                    // 注册成功了
-                    res.setHeader('content-type','text/html');
-                    res.send("<script>alert('欢迎入坑');window.location='/login'</script>")
-                    // 关闭数据库连接即可
-                    client.close();
-                })
-            }
-        })
-        
-    });
+    myT.find("userList",{userName},(err,docs)=>{
+        if(docs.length==0){
+            myT.insert("userList",{userName,userPass},(err,result)=>{
+                if(!err) myT.mess(res,"欢迎加入我们","/login");
+            })
+        }else{
+            myT.mess(res,"用户名已被注册","/register");
+        }
+    })
 })
 
 
